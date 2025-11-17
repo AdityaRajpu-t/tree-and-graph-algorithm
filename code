@@ -1,0 +1,448 @@
+import sys 
+from collections import deque
+import heapq 
+
+# ==============================================================================
+# PART 1: Building Data ADT & Tree Implementations
+# ==============================================================================
+
+# --- 1. Building Data ADT ---
+class Building:
+    """ADT for Campus Building Data, serves as the node data."""
+    def _init_(self, building_id, name, location_details, block_number=None, department=None):
+        self.building_id = building_id
+        self.name = name
+        self.location_details = location_details
+        self.block_number = block_number
+        self.department = department
+
+    def _repr_(self):
+        return f"({self.building_id}: {self.name})"
+
+    # Required methods for BST/AVL comparison (using BuildingID as key)
+    def _lt_(self, other):
+        return self.building_id < other.building_id
+    def _eq_(self, other):
+        return self.building_id == other.building_id
+    def _hash_(self):
+        return hash(self.building_id)
+
+# --- 2. Binary Search Tree (BST) Implementation ---
+class BSTNode:
+    """Base Node for BST and AVL, stores building data and tree pointers."""
+    def _init_(self, building_data):
+        self.data = building_data
+        self.left = None
+        self.right = None
+        self.height = 1 # Tracks height for AVL comparison
+
+class BST:
+    """Binary Search Tree for basic building data storage and retrieval."""
+    def _init_(self):
+        self.root = None
+
+    def insertBuilding(self, building_data):
+        """Method required by ADT: Insert a new building record."""
+        self.root = self._insert_recursive(self.root, building_data)
+
+    def _insert_recursive(self, node, data):
+        if node is None:
+            return BSTNode(data)
+        if data < node.data:
+            node.left = self._insert_recursive(node.left, data)
+        elif data > node.data:
+            node.right = self._insert_recursive(node.right, data)
+        return node
+
+    def searchBuilding(self, building_id):
+        """Method required by ADT: Searches for a building by its ID."""
+        def _search_recursive(node, building_id):
+            if node is None: return None
+            dummy_data = Building(building_id, "", "")
+            if node.data == dummy_data:
+                return node.data
+            elif dummy_data < node.data:
+                return _search_recursive(node.left, building_id)
+            else:
+                return _search_recursive(node.right, building_id)
+        return _search_recursive(self.root, building_id)
+
+    def _inorder_traversal(self, node, result):
+        if node:
+            self._inorder_traversal(node.left, result)
+            result.append(node.data)
+            self._inorder_traversal(node.right, result)
+
+    def _preorder_traversal(self, node, result):
+        if node:
+            result.append(node.data)
+            self._preorder_traversal(node.left, result)
+            self._preorder_traversal(node.right, result)
+
+    def _postorder_traversal(self, node, result):
+        if node:
+            self._postorder_traversal(node.left, result)
+            self._postorder_traversal(node.right, result)
+            result.append(node.data)
+    
+    def traverseBuildings(self, traversal_type='inorder'):
+        """Method required by ADT: Performs and prints tree traversals."""
+        result = []
+        if traversal_type == 'inorder':
+            self._inorder_traversal(self.root, result)
+        elif traversal_type == 'preorder':
+            self._preorder_traversal(self.root, result)
+        elif traversal_type == 'postorder':
+            self._postorder_traversal(self.root, result)
+        else:
+            print(f"Error: Unknown traversal type '{traversal_type}'")
+            return
+        
+        print(f"\n--- {traversal_type.upper()} Traversal ---")
+        print([f"{d.building_id}: {d.name}" for d in result])
+
+    def getHeight(self):
+        """Calculates the height of the tree."""
+        def _get_height_recursive(node):
+            if not node: return 0
+            return 1 + max(_get_height_recursive(node.left), _get_height_recursive(node.right))
+        return _get_height_recursive(self.root)
+
+# --- 3. AVL Tree Implementation ---
+class AVLNode(BSTNode): pass
+
+class AVLTree(BST):
+    """Self-balancing Binary Search Tree for efficient data management."""
+    def _get_height(self, node):
+        return node.height if node else 0
+
+    def _get_balance(self, node):
+        return self._get_height(node.left) - self._get_height(node.right) if node else 0
+
+    def _update_height(self, node):
+        node.height = 1 + max(self._get_height(node.left), self._get_height(node.right))
+
+    # Rotations
+    def _rotate_left(self, z):
+        """RR Rotation (Left Rotation)"""
+        print(f"   -> ROTATION: RR (Left) at ID {z.data.building_id}")
+        y = z.right; T2 = y.left
+        y.left = z; z.right = T2
+        self._update_height(z); self._update_height(y)
+        return y
+
+    def _rotate_right(self, z):
+        """LL Rotation (Right Rotation)"""
+        print(f"   -> ROTATION: LL (Right) at ID {z.data.building_id}")
+        y = z.left; T3 = y.right
+        y.right = z; z.left = T3
+        self._update_height(z); self._update_height(y)
+        return y
+
+    def _insert_recursive(self, node, data):
+        """Inserts data and performs balancing."""
+        if node is None:
+            return AVLNode(data)
+
+        # 1. Standard BST Insertion
+        if data < node.data:
+            node.left = self._insert_recursive(node.left, data)
+        elif data > node.data:
+            node.right = self._insert_recursive(node.right, data)
+            
+        # 2. Update height and check balance
+        self._update_height(node)
+        balance = self._get_balance(node)
+
+        # 3. Perform Rotations based on four cases
+        if balance > 1:
+            if data < node.left.data: # LL Case
+                return self._rotate_right(node)
+            else: # LR Case
+                print(f"   -> ROTATION: LR at ID {node.data.building_id}")
+                node.left = self._rotate_left(node.left)
+                return self._rotate_right(node)
+        
+        if balance < -1:
+            if data > node.right.data: # RR Case
+                return self._rotate_left(node)
+            else: # RL Case
+                print(f"   -> ROTATION: RL at ID {node.data.building_id}")
+                node.right = self._rotate_right(node.right)
+                return self._rotate_left(node)
+
+        return node
+
+    def insertBuilding(self, building_data):
+        """Overridden method to show insertion context."""
+        print(f"Inserting ID {building_data.building_id}: {building_data.name}")
+        self.root = self._insert_recursive(self.root, building_data)
+
+# --- 4. Expression Tree (Utility ADT Method) ---
+class ExpressionTreeNode:
+    """Node for a simple Expression Tree (Binary Operator/Operand)."""
+    def _init_(self, value):
+        self.value = value
+        self.left = None
+        self.right = None
+
+class ExpressionTree:
+    def evaluateExpression(self, root):
+        """Method required by ADT: Evaluates the expression tree."""
+        if not root: return 0
+        if root.left is None and root.right is None: # Leaf node (operand)
+            return float(root.value)
+
+        left_val = self.evaluateExpression(root.left)
+        right_val = self.evaluateExpression(root.right)
+
+        # Simple arithmetic operations
+        if root.value == '+': return left_val + right_val
+        if root.value == '-': return left_val - right_val
+        if root.value == '*': return left_val * right_val
+        if root.value == '/': return left_val / right_val
+
+    def construct_example(self):
+        """Example: (20 * 5) + (100 / 2) for energy bill calculation."""
+        root = ExpressionTreeNode('+')
+        root.left = ExpressionTreeNode('*')
+        root.right = ExpressionTreeNode('/')
+        root.left.left = ExpressionTreeNode('20')
+        root.left.right = ExpressionTreeNode('5')
+        root.right.left = ExpressionTreeNode('100')
+        root.right.right = ExpressionTreeNode('2')
+        return root
+
+    def traverse(self, node):
+        """Infix traversal to show expression structure."""
+        if node:
+            if node.left and node.right:
+                return f"({self.traverse(node.left)} {node.value} {self.traverse(node.right)})"
+            return node.value
+        return ""
+
+
+# ==============================================================================
+# PART 2: Graph Implementation & Algorithms
+# ==============================================================================
+
+class CampusGraph:
+    """Models campus paths and executes navigation/utility algorithms."""
+    def _init_(self, building_data_list):
+        self.buildings = {b.building_id: b.name for b in building_data_list}
+        self.ids = list(self.buildings.keys())
+        self.num_buildings = len(self.ids)
+        self.id_to_index = {id: i for i, id in enumerate(self.ids)}
+        
+        # Adjacency List: {id: [(neighbor_id, weight)]}
+        self.adj_list = {id: [] for id in self.ids}
+        # Adjacency Matrix
+        self.adj_matrix = [[0] * self.num_buildings for _ in range(self.num_buildings)]
+        # List of all edges for Kruskal's: [(weight, u, v)]
+        self.edges = [] 
+
+    def constructCampusGraph(self, path_data):
+        """Method required by ADT: Populates the graph structures."""
+        for f, t, w in path_data:
+            self._add_path(f, t, w)
+
+    def _add_path(self, from_id, to_id, weight=1):
+        """Adds a weighted path (edge) between two buildings."""
+        if from_id not in self.buildings or to_id not in self.buildings: return
+
+        # 1. Adjacency List (undirected)
+        self.adj_list[from_id].append((to_id, weight))
+        self.adj_list[to_id].append((from_id, weight)) 
+
+        # 2. Adjacency Matrix (undirected)
+        from_idx = self.id_to_index[from_id]
+        to_idx = self.id_to_index[to_id]
+        self.adj_matrix[from_idx][to_idx] = weight
+        self.adj_matrix[to_idx][from_idx] = weight
+
+        # 3. Edges list for Kruskal's
+        self.edges.append((weight, from_id, to_id))
+
+    # --- Graph Traversals (BFS & DFS) ---
+    def bfs_traversal(self, start_id):
+        """Performs Breadth First Search using a queue."""
+        if start_id not in self.buildings: return []
+        queue = deque([start_id]); visited = {start_id}; traversal_order = []
+        while queue:
+            current_id = queue.popleft()
+            traversal_order.append(f"[{current_id}] {self.buildings[current_id]}")
+            for neighbor_id, _ in self.adj_list[current_id]:
+                if neighbor_id not in visited:
+                    visited.add(neighbor_id)
+                    queue.append(neighbor_id)
+        print("\n--- BFS Traversal ---")
+        print(" -> ".join(traversal_order))
+
+    def dfs_traversal(self, start_id):
+        """Performs Depth First Search using recursion (stack implicitly)."""
+        if start_id not in self.buildings: return []
+        visited = set(); traversal_order = []
+        def dfs_recursive(current_id):
+            visited.add(current_id)
+            traversal_order.append(f"[{current_id}] {self.buildings[current_id]}")
+            for neighbor_id, _ in self.adj_list[current_id]:
+                if neighbor_id not in visited:
+                    dfs_recursive(neighbor_id)
+        dfs_recursive(start_id)
+        print("\n--- DFS Traversal ---")
+        print(" -> ".join(traversal_order))
+
+    # --- Dijkstra's Algorithm (Optimal Navigation) ---
+    def findOptimalPath(self, start_id, end_id):
+        """Method required by ADT: Applies Dijkstra's for shortest path."""
+        # Dijkstra's uses a Priority Queue (min-heap)
+        pq = [(0, start_id)]
+        distances = {building_id: sys.maxsize for building_id in self.ids}
+        distances[start_id] = 0
+        previous_nodes = {building_id: None for building_id in self.ids}
+        
+        while pq:
+            current_distance, current_id = heapq.heappop(pq)
+            
+            if current_distance > distances[current_id]:
+                continue
+            
+            for neighbor_id, weight in self.adj_list[current_id]:
+                distance = current_distance + weight
+                if distance < distances[neighbor_id]:
+                    distances[neighbor_id] = distance
+                    previous_nodes[neighbor_id] = current_id
+                    heapq.heappush(pq, (distance, neighbor_id))
+
+        # Reconstruct path
+        path = deque()
+        current = end_id
+        while current is not None:
+            path.appendleft(self.buildings.get(current, str(current)))
+            if current == start_id: break
+            current = previous_nodes[current]
+        
+        print("\n--- Optimal Path (Dijkstra's) ---")
+        if distances[end_id] == sys.maxsize:
+            return f"Path from {self.buildings[start_id]} to {self.buildings[end_id]} not found."
+        else:
+            return f"Shortest Distance: {distances[end_id]}\nPath: {' -> '.join(path)}"
+
+    # --- Kruskal's Algorithm (Utility Layout) ---
+    def planUtilityLayout(self):
+        """Method required by ADT: Applies Kruskal's for Minimum Spanning Tree (MST)."""
+        
+        # Disjoint Set Union (Union-Find) structure
+        parent = {id: id for id in self.ids}
+        def find(i):
+            if parent[i] == i: return i
+            parent[i] = find(parent[i])
+            return parent[i]
+
+        def union(i, j):
+            root_i = find(i); root_j = find(j)
+            if root_i != root_j:
+                parent[root_i] = root_j
+                return True
+            return False
+
+        # 1. Sort all edges by weight
+        self.edges.sort()
+        mst_edges = []
+        min_cost = 0
+
+        # 2. Iterate through sorted edges, adding if no cycle is formed
+        for weight, u, v in self.edges:
+            if union(u, v):
+                mst_edges.append((weight, u, v))
+                min_cost += weight
+                # Stop when MST is complete (V - 1 edges)
+                if len(mst_edges) == self.num_buildings - 1:
+                    break
+        
+        print("\n--- Kruskal's Minimum Spanning Tree (MST) for Utility Layout ---")
+        print(f"Total Minimum Cable Cost/Distance: {min_cost}")
+        for w, u, v in mst_edges:
+            print(f"  {self.buildings[u]} <-> {self.buildings[v]} (Cost: {w})")
+
+
+# ==============================================================================
+# EXECUTION AND DEMONSTRATION
+# ==============================================================================
+
+if _name_ == '_main_':
+    # --- Setup Data ---
+    BUILDINGS_DATA = [
+        Building(50, "Science Lab", "West Campus", 2, "Physics"),
+        Building(30, "Main Library", "Central Quad", 1, "General"),
+        Building(70, "Admin Block", "North Entrance", 3, "Management"),
+        Building(20, "Cafe/Student Center", "Near Dorms", 4, "Services"),
+        Building(40, "Arts Studio", "South Wing", 1, "Arts"),
+        Building(60, "Computer Science", "East Wing", 2, "CS/IT"),
+        Building(80, "Auditorium", "North Exit", 3, "Events"),
+        Building(55, "Eng. Workshop", "West Wing", 2, "Engineering"),
+        Building(10, "Security Gate", "Entrance", 4, "Security"),
+        Building(90, "Dorms A", "Residential", 4, "Housing"),
+    ]
+
+    # ------------------------------------------------------------------
+    # DEMO PART 1: TREE IMPLEMENTATION 🌳
+    # ------------------------------------------------------------------
+    print("="*80); print("PART 1: TREE IMPLEMENTATION (BST, AVL, Expression Tree)")
+    
+    # AVL Demo (shows rotations and height comparison)
+    print("\n--- AVL Tree Insertion Demo (Rotations) ---")
+    avl = AVLTree()
+    for b in BUILDINGS_DATA:
+        avl.insertBuilding(b)
+    
+    print(f"\nAVL Tree Height: {avl.getHeight()}")
+
+    # BST Demo
+    bst = BST()
+    for b in BUILDINGS_DATA:
+        bst.insertBuilding(b)
+    
+    print(f"BST Height (unbalanced): {bst.getHeight()}")
+    bst.traverseBuildings('inorder')
+    bst.traverseBuildings('preorder')
+    bst.traverseBuildings('postorder')
+    
+    # Expression Tree Demo (Energy Bill Calculation)
+    exp_tree = ExpressionTree()
+    root = exp_tree.construct_example()
+    print("\n--- Expression Tree Evaluation (Energy Bill) ---")
+    print(f"Expression: {exp_tree.traverse(root)}")
+    print(f"Evaluation Result: {exp_tree.evaluateExpression(root)}")
+
+    # ------------------------------------------------------------------
+    # DEMO PART 2: GRAPH IMPLEMENTATION & ALGORITHMS 🗺
+    # ------------------------------------------------------------------
+    print("\n\n" + "="*80); print("PART 2: GRAPH IMPLEMENTATION & ALGORITHMS (BFS, DFS, Dijkstra's, Kruskal's)")
+    graph_planner = CampusGraph(BUILDINGS_DATA)
+
+    # Define paths (Edges with Weights/Distances) - (from_id, to_id, weight)
+    PATHS = [
+        (30, 40, 5),  # Library to Arts
+        (30, 70, 10), # Library to Admin
+        (70, 80, 2),  # Admin to Auditorium
+        (40, 20, 3),  # Arts to Cafe
+        (20, 50, 8),  # Cafe to Science
+        (50, 60, 4),  # Science to CS
+        (50, 55, 1),  # Science to Engineering
+        (10, 30, 15), # Gate to Library
+        (10, 90, 6),  # Gate to Dorms
+        (90, 20, 1),  # Dorms to Cafe
+        (70, 55, 12)  # Admin to Eng. Workshop
+    ]
+    graph_planner.constructCampusGraph(PATHS)
+    
+    # Graph Traversals
+    graph_planner.bfs_traversal(start_id=30) 
+    graph_planner.dfs_traversal(start_id=30) 
+
+    # Optimal Pathfinding (Dijkstra's)
+    print(graph_planner.findOptimalPath(start_id=10, end_id=60)) # Security Gate (10) -> Computer Science (60)
+
+    # Utility Layout (Kruskal's)
+    graph_planner.planUtilityLayout()
